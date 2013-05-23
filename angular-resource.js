@@ -1,5 +1,5 @@
 /**
- * @license AngularJS v1.1.5-99cd86a
+ * @license AngularJS v1.1.6-0272240
  * (c) 2010-2012 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -91,7 +91,8 @@
  *     GET request, otherwise if a cache instance built with
  *     {@link ng.$cacheFactory $cacheFactory}, this cache will be used for
  *     caching.
- *   - **`timeout`** – `{number}` – timeout in milliseconds.
+ *   - **`timeout`** – `{number|Promise}` – timeout in milliseconds, or {@link ng.$q promise} that
+ *     should abort the request when resolved.
  *   - **`withCredentials`** - `{boolean}` - whether to to set the `withCredentials` flag on the
  *     XHR object. See {@link https://developer.mozilla.org/en/http_access_control#section_5
  *     requests with credentials} for more information.
@@ -398,7 +399,7 @@ angular.module('ngResource', ['ng']).
         actionParams = extend({}, paramDefaults, actionParams);
         forEach(actionParams, function(value, key){
           if (isFunction(value)) { value = value(); }
-          ids[key] = value.charAt && value.charAt(0) == '@' ? getter(data, value.substr(1)) : value;
+          ids[key] = value && value.charAt && value.charAt(0) == '@' ? getter(data, value.substr(1)) : value;
         });
         return ids;
       }
