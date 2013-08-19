@@ -9472,7 +9472,7 @@ if ( typeof define === "function" && define.amd && define.amd.jQuery ) {
 })( window );
 
 /**
- * @license AngularJS v1.1.6-e4b6a1e
+ * @license AngularJS v1.2.0rc1
  * (c) 2010-2012 Google, Inc. http://angularjs.org
  * License: MIT
  */
@@ -10146,6 +10146,8 @@ function copy(source, destination){
         destination = copy(source, []);
       } else if (isDate(source)) {
         destination = new Date(source.getTime());
+      } else if (isRegExp(source)) {
+        destination = new RegExp(source.source);
       } else if (isObject(source)) {
         destination = copy(source, {});
       }
@@ -10582,6 +10584,12 @@ function angularInit(element, bootstrap) {
 function bootstrap(element, modules) {
   var doBootstrap = function() {
     element = jqLite(element);
+
+    if (element.injector()) {
+      var tag = (element[0] === document) ? 'document' : startingTag(element);
+      throw ngMinErr('btstrpd', "App Already Bootstrapped with this Element '{0}'", tag);
+    }
+
     modules = modules || [];
     modules.unshift(['$provide', function($provide) {
       $provide.value('$rootElement', element);
@@ -10989,10 +10997,10 @@ function setupModuleLoader(window) {
  * - `codeName` – `{string}` – Code name of the release, such as "jiggling-armfat".
  */
 var version = {
-  full: '1.1.6-e4b6a1e',    // all of these placeholder strings will be replaced by grunt's
+  full: '1.2.0rc1',    // all of these placeholder strings will be replaced by grunt's
   major: 1,    // package task
-  minor: 1,
-  dot: 6,
+  minor: 2,
+  dot: 0,
   codeName: 'spooky-giraffe'
 };
 
@@ -11301,8 +11309,8 @@ function JQLiteDealoc(element){
   }
 }
 
-function JQLiteOff(element, type, fn) {
-  if ( arguments.length > 4 ) throw jqLiteMinErr('off_args', 'jqLite#off() does not support the `selector` parameter');
+function JQLiteOff(element, type, fn, unsupported) {
+  if (isDefined(unsupported)) throw jqLiteMinErr('offargs', 'jqLite#off() does not support the `selector` argument');
 
   var events = JQLiteExpandoStore(element, 'events'),
       handle = JQLiteExpandoStore(element, 'handle');
@@ -11438,7 +11446,7 @@ function JQLiteInheritedData(element, name, value) {
   }
 
   while (element.length) {
-    if (value = element.data(name)) return value;
+    if ((value = element.data(name)) !== undefined) return value;
     element = element.parent();
   }
 }
@@ -11740,8 +11748,8 @@ forEach({
 
   dealoc: JQLiteDealoc,
 
-  on: function onFn(element, type, fn, other1){
-    if ( isDefined(other1) ) throw jqLiteMinErr('on_args', 'jqLite#on() does not support the `selector` or `eventData` parameters');
+  on: function onFn(element, type, fn, unsupported){
+    if (isDefined(unsupported)) throw jqLiteMinErr('onargs', 'jqLite#on() does not support the `selector` or `eventData` parameters');
 
     var events = JQLiteExpandoStore(element, 'events'),
         handle = JQLiteExpandoStore(element, 'handle');
@@ -13665,7 +13673,7 @@ function $CompileProvider($provide) {
    *
    * @param {string} name Name of the directive in camel-case. (ie <code>ngBind</code> which will match as
    *                <code>ng-bind</code>).
-   * @param {function} directiveFactory An injectable directive factory function. See {@link guide/directive} for more
+   * @param {function|Array} directiveFactory An injectable directive factory function. See {@link guide/directive} for more
    *                info.
    * @returns {ng.$compileProvider} Self for chaining.
    */
@@ -13788,7 +13796,7 @@ function $CompileProvider($provide) {
        *
        * @description
        * Adds the CSS class value specified by the classVal parameter to the element. If animations
-       * are enabled then an animation will be triggered for the class addition.  
+       * are enabled then an animation will be triggered for the class addition.
        *
        * @param {string} classVal The className value that will be added to the element
        */
@@ -13806,7 +13814,7 @@ function $CompileProvider($provide) {
        *
        * @description
        * Removes the CSS class value specified by the classVal parameter from the element. If animations
-       * are enabled then an animation will be triggered for the class removal.  
+       * are enabled then an animation will be triggered for the class removal.
        *
        * @param {string} classVal The className value that will be removed from the element
        */
@@ -14184,7 +14192,7 @@ function $CompileProvider($provide) {
         var startNode = node;
         do {
           if (!node) {
-            throw $compileMinErr('utrat', "Unterminated attribute, found '{0}' but no matching '{1}' found.", attrStart, attrEnd);
+            throw $compileMinErr('uterdir', "Unterminated attribute, found '{0}' but no matching '{1}' found.", attrStart, attrEnd);
           }
           if (node.nodeType == 1 /** Element **/) {
             if (node.hasAttribute(attrStart)) depth++;
@@ -14471,7 +14479,7 @@ function $CompileProvider($provide) {
                 parentSet = parentGet.assign || function() {
                   // reset the change, or we will throw this exception on every $digest
                   lastValue = scope[scopeName] = parentGet(parentScope);
-                  throw $compileMinErr('noass', "Expression '{0}' used with directive '{1}' is non-assignable!",
+                  throw $compileMinErr('nonassign', "Expression '{0}' used with directive '{1}' is non-assignable!",
                       attrs[attrName], newIsolateScopeDirective.name);
                 };
                 lastValue = scope[scopeName] = parentGet(parentScope);
@@ -14528,11 +14536,6 @@ function $CompileProvider($provide) {
                 '$' + directive.name + 'Controller',
                 controllerInstance);
             if (directive.controllerAs) {
-              if (typeof locals.$scope !== 'object') {
-                throw new Error('Can not export controller as "' + directive.controllerAs + '". ' +
-                    'No scope object provided!');
-              }
-
               locals.$scope[directive.controllerAs] = controllerInstance;
             }
           });
@@ -14706,9 +14709,10 @@ function $CompileProvider($provide) {
               replaceWith(linkRootElement, jqLite(beforeTemplateLinkNode), linkNode);
             }
 
-            afterTemplateNodeLinkFn(function() {
-              beforeTemplateNodeLinkFn(afterTemplateChildLinkFn, scope, linkNode, $rootElement, controller);
-            }, scope, linkNode, $rootElement, controller);
+            afterTemplateNodeLinkFn(
+              beforeTemplateNodeLinkFn(afterTemplateChildLinkFn, scope, linkNode, $rootElement, controller),
+              scope, linkNode, $rootElement, controller
+            );
           }
           linkQueue = null;
         }).
@@ -14784,7 +14788,7 @@ function $CompileProvider($provide) {
 
 
       if (name === "multiple" && nodeName_(node) === "SELECT") {
-        throw $compileMinErr("selmulti", "Binding to the multiple attribute is not supported. Element: {0}",
+        throw $compileMinErr("selmulti", "Binding to the 'multiple' attribute is not supported. Element: {0}",
             startingTag(node));
       }
 
@@ -16609,6 +16613,7 @@ function serverBase(url) {
  * @param {string} basePrefix url path prefix
  */
 function LocationHtml5Url(appBase, basePrefix) {
+  this.$$html5 = true;
   basePrefix = basePrefix || '';
   var appBaseNoFile = stripFile(appBase);
   /**
@@ -16621,7 +16626,7 @@ function LocationHtml5Url(appBase, basePrefix) {
     matchUrl(url, parsed);
     var pathUrl = beginsWith(appBaseNoFile, url);
     if (!isString(pathUrl)) {
-      throw $locationMinErr('nopp', 'Invalid url "{0}", missing path prefix "{1}".', url, appBaseNoFile);
+      throw $locationMinErr('ipthprfx', 'Invalid url "{0}", missing path prefix "{1}".', url, appBaseNoFile);
     }
     matchAppUrl(pathUrl, parsed);
     extend(this, parsed);
@@ -16665,7 +16670,8 @@ function LocationHtml5Url(appBase, basePrefix) {
 
 /**
  * LocationHashbangUrl represents url
- * This object is exposed as $location service when html5 history api is disabled or not supported
+ * This object is exposed as $location service when developer doesn't opt into html5 mode.
+ * It also serves as the base class for html5 mode fallback on legacy browsers.
  *
  * @constructor
  * @param {string} appBase application base URL
@@ -16674,20 +16680,24 @@ function LocationHtml5Url(appBase, basePrefix) {
 function LocationHashbangUrl(appBase, hashPrefix) {
   var appBaseNoFile = stripFile(appBase);
 
+  matchUrl(appBase, this);
+
+
   /**
    * Parse given hashbang url into properties
    * @param {string} url Hashbang url
    * @private
    */
   this.$$parse = function(url) {
-    matchUrl(url, this);
     var withoutBaseUrl = beginsWith(appBase, url) || beginsWith(appBaseNoFile, url);
-    if (!isString(withoutBaseUrl)) {
-      throw $locationMinErr('istart', 'Invalid url "{0}", does not start with "{1}".', url, appBase);
-    }
-    var withoutHashUrl = withoutBaseUrl.charAt(0) == '#' ? beginsWith(hashPrefix, withoutBaseUrl) : withoutBaseUrl;
+    var withoutHashUrl = withoutBaseUrl.charAt(0) == '#'
+        ? beginsWith(hashPrefix, withoutBaseUrl)
+        : (this.$$html5)
+          ? withoutBaseUrl
+          : '';
+
     if (!isString(withoutHashUrl)) {
-      throw $locationMinErr('nohash', 'Invalid url "{0}", missing hash prefix "{1}".', url, hashPrefix);
+      throw $locationMinErr('ihshprfx', 'Invalid url "{0}", missing hash prefix "{1}".', url, hashPrefix);
     }
     matchAppUrl(withoutHashUrl, this);
     this.$$compose();
@@ -16723,6 +16733,7 @@ function LocationHashbangUrl(appBase, hashPrefix) {
  * @param {string} hashPrefix hashbang prefix
  */
 function LocationHashbangInHtml5Url(appBase, hashPrefix) {
+  this.$$html5 = true;
   LocationHashbangUrl.apply(this, arguments);
 
   var appBaseNoFile = stripFile(appBase);
@@ -16744,6 +16755,12 @@ function LocationHashbangInHtml5Url(appBase, hashPrefix) {
 LocationHashbangInHtml5Url.prototype =
   LocationHashbangUrl.prototype =
   LocationHtml5Url.prototype = {
+
+  /**
+   * Are we in html5 mode?
+   * @private
+   */
+  $$html5: false,
 
   /**
    * Has any change been replacing ?
@@ -16887,7 +16904,7 @@ LocationHashbangInHtml5Url.prototype =
         } else if (isObject(search)) {
           this.$$search = search;
         } else {
-          throw $locationMinErr('wpt', 'First parameter of function must be string or an object.');
+          throw $locationMinErr('isrcharg', 'The first argument of the `$location#search()` call must be a string or an object.');
         }
         break;
       default:
@@ -18346,11 +18363,17 @@ function $ParseProvider() {
  *   This method *returns a new promise* which is resolved or rejected via the return value of the
  *   `successCallback` or `errorCallback`.
  *
- * - `always(callback)` – allows you to observe either the fulfillment or rejection of a promise,
+ * - `catch(errorCallback)` – shorthand for `promise.then(null, errorCallback)`
+ *
+ * - `finally(callback)` – allows you to observe either the fulfillment or rejection of a promise,
  *   but to do so without modifying the final value. This is useful to release resources or do some
  *   clean-up that needs to be done whether the promise was rejected or resolved. See the [full
  *   specification](https://github.com/kriskowal/q/wiki/API-Reference#promisefinallycallback) for
  *   more information.
+ *
+ *   Because `finally` is a reserved word in JavaScript and reserved keywords are not supported as
+ *   property names by ES3, you'll need to invoke the method like `promise['finally'](callback)` to
+ *   make your code IE8 compatible.
  *
  * # Chaining promises
  *
@@ -18383,25 +18406,25 @@ function $ParseProvider() {
  *   you can treat promises attached to a scope as if they were the resulting values.
  * - Q has many more features than $q, but that comes at a cost of bytes. $q is tiny, but contains
  *   all the important functionality needed for common async tasks.
- * 
+ *
  *  # Testing
- * 
+ *
  *  <pre>
  *    it('should simulate promise', inject(function($q, $rootScope) {
  *      var deferred = $q.defer();
  *      var promise = deferred.promise;
  *      var resolvedValue;
- * 
+ *
  *      promise.then(function(value) { resolvedValue = value; });
  *      expect(resolvedValue).toBeUndefined();
- * 
+ *
  *      // Simulate resolving of promise
  *      deferred.resolve(123);
  *      // Note that the 'then' function does not get called synchronously.
  *      // This is because we want the promise API to always be async, whether or not
  *      // it got called synchronously or asynchronously.
  *      expect(resolvedValue).toBeUndefined();
- * 
+ *
  *      // Propagate promise resolution to 'then' functions using $apply().
  *      $rootScope.$apply();
  *      expect(resolvedValue).toEqual(123);
@@ -18522,8 +18545,13 @@ function qFactory(nextTick, exceptionHandler) {
 
           return result.promise;
         },
-        always: function(callback) {
-          
+
+        "catch": function(callback) {
+          return this.then(null, callback);
+        },
+
+        "finally": function(callback) {
+
           function makePromise(value, resolved) {
             var result = defer();
             if (resolved) {
@@ -18533,14 +18561,14 @@ function qFactory(nextTick, exceptionHandler) {
             }
             return result.promise;
           }
-          
+
           function handleCallback(value, isResolved) {
-            var callbackOutput = null;            
+            var callbackOutput = null;
             try {
               callbackOutput = (callback ||defaultCallback)();
             } catch(e) {
               return makePromise(e, false);
-            }            
+            }
             if (callbackOutput && callbackOutput.then) {
               return callbackOutput.then(function() {
                 return makePromise(value, isResolved);
@@ -18551,7 +18579,7 @@ function qFactory(nextTick, exceptionHandler) {
               return makePromise(value, isResolved);
             }
           }
-          
+
           return this.then(function(value) {
             return handleCallback(value, true);
           }, function(error) {
@@ -19998,7 +20026,7 @@ function $SceDelegateProvider() {
         if (isResourceUrlAllowedByPolicy(maybeTrusted)) {
           return maybeTrusted;
         } else {
-          throw $sceMinErr('isecrurl',
+          throw $sceMinErr('insecurl',
               'Blocked loading resource from url not allowed by $sceDelegate policy.  URL: {0}', maybeTrusted.toString());
         }
       } else if (type === SCE_CONTEXTS.HTML) {
@@ -23558,6 +23586,10 @@ var VALID_CLASS = 'ng-valid',
  * @property {Array.<Function>} $parsers Array of functions to execute, as a pipeline, whenever
        the control reads value from the DOM.  Each function is called, in turn, passing the value
        through to the next. Used to sanitize / convert the value as well as validation.
+       For validation, the parsers should update the validity state using
+       {@link ng.directive:ngModel.NgModelController#$setValidity $setValidity()},
+       and return `undefined` for invalid values.
+
  *
  * @property {Array.<Function>} $formatters Array of functions to execute, as a pipeline, whenever
        the model value changes. Each function is called, in turn, passing the value through to the
@@ -23783,8 +23815,8 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
    * For example {@link ng.directive:input input} or
    * {@link ng.directive:select select} directives call it.
    *
-   * It internally calls all `parsers` and if resulted value is valid, updates the model and
-   * calls all registered change listeners.
+   * It internally calls all `$parsers` (including validators) and updates the `$modelValue` and the actual model path.
+   * Lastly it calls all registered change listeners.
    *
    * @param {string} value Value from the view.
    */
@@ -23850,7 +23882,8 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
  *
  * @description
  * Is a directive that tells Angular to do two-way data binding. It works together with `input`,
- * `select`, `textarea`. You can easily write your own directives to use `ngModel` as well.
+ * `select`, `textarea` and even custom form controls that use {@link ng.directive:ngModel.NgModelController
+ * NgModelController} exposed by this directive.
  *
  * `ngModel` is responsible for:
  *
@@ -25340,18 +25373,23 @@ var ngIfDirective = ['$animate', function($animate) {
  * @description
  * Emitted every time the ngInclude content is reloaded.
  */
+var NG_INCLUDE_PRIORITY = 500;
 var ngIncludeDirective = ['$http', '$templateCache', '$anchorScroll', '$compile', '$animate', '$sce',
                   function($http,   $templateCache,   $anchorScroll,   $compile,   $animate,   $sce) {
   return {
     restrict: 'ECA',
     terminal: true,
-    transclude: 'element',
-    compile: function(element, attr, transclusion) {
+    priority: NG_INCLUDE_PRIORITY,
+    compile: function(element, attr) {
       var srcExp = attr.ngInclude || attr.src,
           onloadExp = attr.onload || '',
           autoScrollExp = attr.autoscroll;
 
-      return function(scope, $element) {
+      element.html('');
+      var anchor = jqLite(document.createComment(' ngInclude: ' + srcExp + ' '));
+      element.replaceWith(anchor);
+
+      return function(scope) {
         var changeCounter = 0,
             currentScope,
             currentElement;
@@ -25375,23 +25413,21 @@ var ngIncludeDirective = ['$http', '$templateCache', '$anchorScroll', '$compile'
               if (thisChangeId !== changeCounter) return;
               var newScope = scope.$new();
 
-              transclusion(newScope, function(clone) {
-                cleanupLastIncludeContent();
+              cleanupLastIncludeContent();
 
-                currentScope = newScope;
-                currentElement = clone;
+              currentScope = newScope;
+              currentElement = element.clone();
+              currentElement.html(response);
+              $animate.enter(currentElement, null, anchor);
 
-                currentElement.html(response);
-                $animate.enter(currentElement, null, $element);
-                $compile(currentElement.contents())(currentScope);
+              $compile(currentElement, false, NG_INCLUDE_PRIORITY - 1)(currentScope);
 
-                if (isDefined(autoScrollExp) && (!autoScrollExp || scope.$eval(autoScrollExp))) {
-                  $anchorScroll();
-                }
+              if (isDefined(autoScrollExp) && (!autoScrollExp || scope.$eval(autoScrollExp))) {
+                $anchorScroll();
+              }
 
-                currentScope.$emit('$includeContentLoaded');
-                scope.$eval(onloadExp);
-              });
+              currentScope.$emit('$includeContentLoaded');
+              scope.$eval(onloadExp);
             }).error(function() {
               if (thisChangeId === changeCounter) cleanupLastIncludeContent();
             });

@@ -1,5 +1,5 @@
 /**
- * @license AngularJS v1.1.6-e4b6a1e
+ * @license AngularJS v1.2.0rc1
  * (c) 2010-2012 Google, Inc. http://angularjs.org
  * License: MIT
  *
@@ -693,60 +693,6 @@ angular.mock.animate = angular.module('mock.animate', ['ng'])
 
   }]);
 
-/**
- * @ngdoc function
- * @name angular.mock.createMockWindow
- * @description
- *
- * This function creates a mock window object useful for controlling access ot setTimeout, but mocking out
- * sufficient window's properties to allow Angular to execute.
- *
- * @example
- *
- * <pre>
-    beforeEach(module(function($provide) {
-      $provide.value('$window', window = angular.mock.createMockWindow());
-    }));
-
-    it('should do something', inject(function($window) {
-      var val = null;
-      $window.setTimeout(function() { val = 123; }, 10);
-      expect(val).toEqual(null);
-      window.setTimeout.expect(10).process();
-      expect(val).toEqual(123);
-    });
- * </pre>
- *
- */
-angular.mock.createMockWindow = function() {
-  var mockWindow = {};
-  var setTimeoutQueue = [];
-
-  mockWindow.location = window.location;
-  mockWindow.document = window.document;
-  mockWindow.getComputedStyle = angular.bind(window, window.getComputedStyle);
-  mockWindow.scrollTo = angular.bind(window, window.scrollTo);
-  mockWindow.navigator = window.navigator;
-  mockWindow.setTimeout = function(fn, delay) {
-    setTimeoutQueue.push({fn: fn, delay: delay});
-  };
-  mockWindow.setTimeout.queue = setTimeoutQueue;
-  mockWindow.setTimeout.expect = function(delay) {
-    if (setTimeoutQueue.length > 0) {
-      return {
-        process: function() {
-          var tick = setTimeoutQueue.shift();
-          expect(tick.delay).toEqual(delay);
-          tick.fn();
-        }
-      };
-    } else {
-      expect('SetTimoutQueue empty. Expecting delay of ').toEqual(delay);
-    }
-  };
-
-  return mockWindow;
-};
 
 /**
  * @ngdoc function
@@ -1246,8 +1192,9 @@ function createHttpBackendMock($rootScope, $delegate, $browser) {
    *
    * @param {string} method HTTP method.
    * @param {string|RegExp} url HTTP url.
-   * @param {(string|RegExp|function(string))=} data HTTP request body or function that receives
-   *   data string and returns true if the data is as expected.
+   * @param {(string|RegExp|function(string)|Object)=} data HTTP request body or function that
+   *  receives data string and returns true if the data is as expected, or Object if request body
+   *  is in JSON format.
    * @param {(Object|function(Object))=} headers HTTP headers or function that receives http header
    *   object and returns true if the headers match the current expectation.
    * @returns {requestHandler} Returns an object with `respond` method that control how a matched
@@ -1316,8 +1263,9 @@ function createHttpBackendMock($rootScope, $delegate, $browser) {
    * Creates a new request expectation for POST requests. For more info see `expect()`.
    *
    * @param {string|RegExp} url HTTP url.
-   * @param {(string|RegExp|function(string))=} data HTTP request body or function that receives
-   *   data string and returns true if the data is as expected.
+   * @param {(string|RegExp|function(string)|Object)=} data HTTP request body or function that
+   *  receives data string and returns true if the data is as expected, or Object if request body
+   *  is in JSON format.
    * @param {Object=} headers HTTP headers.
    * @returns {requestHandler} Returns an object with `respond` method that control how a matched
    *   request is handled.
@@ -1331,8 +1279,9 @@ function createHttpBackendMock($rootScope, $delegate, $browser) {
    * Creates a new request expectation for PUT requests. For more info see `expect()`.
    *
    * @param {string|RegExp} url HTTP url.
-   * @param {(string|RegExp|function(string))=} data HTTP request body or function that receives
-   *   data string and returns true if the data is as expected.
+   * @param {(string|RegExp|function(string)|Object)=} data HTTP request body or function that
+   *  receives data string and returns true if the data is as expected, or Object if request body
+   *  is in JSON format.
    * @param {Object=} headers HTTP headers.
    * @returns {requestHandler} Returns an object with `respond` method that control how a matched
    *   request is handled.
@@ -1346,8 +1295,9 @@ function createHttpBackendMock($rootScope, $delegate, $browser) {
    * Creates a new request expectation for PATCH requests. For more info see `expect()`.
    *
    * @param {string|RegExp} url HTTP url.
-   * @param {(string|RegExp|function(string))=} data HTTP request body or function that receives
-   *   data string and returns true if the data is as expected.
+   * @param {(string|RegExp|function(string)|Object)=} data HTTP request body or function that
+   *  receives data string and returns true if the data is as expected, or Object if request body
+   *  is in JSON format.
    * @param {Object=} headers HTTP headers.
    * @returns {requestHandler} Returns an object with `respond` method that control how a matched
    *   request is handled.
